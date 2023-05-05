@@ -1,149 +1,106 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "Tstack.h"
+#include <ctype.h>
+#include <math.h>
 
-int alphabet(char c) {
-    switch (c) {
-        case '1': return 1;
-        case '2': return 2;
-        case '3': return 3;
-        case '4': return 4;
-        case '5': return 5;
-        case '6': return 6;
-        case '7': return 7;
-        case '8': return 8;
-        case '9': return 9;
-        case '0': return 0;
-    }
-    return -1;
-}
+#define MAX_EXPR_LENGTH 1024
 
-int Cheching_for_a_Num(char a) {
-    return (a >= '0' && a <= '9');
-}
+double variables[26]; // массив для хранения значений переменных
 
-int get_operator_priority(char op) {
-    if (op == '+' || op == '-') {
-        return 1;
-    }
-    else if (op == '*' || op == '/') {
-        return 2;
-    }
-    else {
-        return 0;
-    }
-}
-
-int ifOperator(char c) {
-    switch (c) {
-        case '+': return 1;
-        case '-': return 2;
-        case '*': return 3;
-        case '/': return 4;
-    }
-    return 0;
-}
-
-char* infx2pstfx(char* inf) {
-    TStack s;
-    s.top = NULL;
-    char* result = (char*)malloc(sizeof(char) * strlen(inf) * 2);
-    int j = 0;
-    for (int i = 0; i < strlen(inf); i++) {
-        char c = inf[i];
-        if (Cheching_for_a_Num(c)) {
-            result[j] = c;
-            j++;
-        }
-        else if (c == '(') {
-            push(&s, c);
-        }
-        else if (c == ')') {
-            while (!isEmpty(s) && peek(s) != '(') {
-                result[j] = peek(s);
-                j++;
-                pop(&s);
-            }
-            pop(&s);
-        }
-        else if (ifOperator(c)) {
-            while (!isEmpty(s) && \
-            get_operator_priority(peek(s)) >= get_operator_priority(c)) {
-                result[j] = peek(s);
-                j++;
-                pop(&s);
-            }
-            push(&s, c);
-        }
-    }
-    while (!isEmpty(s)) {
-        result[j] = peek(s);
-        j++;
-        pop(&s);
-    }
-    result[j] = '\0';
-    char* end = (char*)malloc(sizeof(char) * strlen(result) * 2);
-    j = 0;
-    for (int i = 0; i < strlen(result); i++) {
-        if (i < strlen(result) - 1) {
-            end[j] = result[i];
-            j++;
-            end[j] = ' ';
-            j++;
-        }
-        else {
-            end[j] = result[i];
-            j++;
-        }
-    }
-    end[j] = '\0';
-    return end;
-}
-
-int eval(char* post) {
-    TStack s;
-    int i = 0;
-    while (post[i]) {
-        char c = post[i];
-        if (Cheching_for_a_Num(c)) {
-            push(&s, alphabet(c));
-        }
-        else {
-            int temp2 = Get(&s);
-            Pop(&s);
-            int temp1 = Get(&s);
-            Pop(&s);
-            switch (c) {
-                case '+':
-                    push(&s, temp1 + temp2);
-                    break;
-                case '-':
-                    push(&s, temp1 - temp2);
-                    break;
-                case '*':
-                    push(&s, temp1 * temp2);
-                    break;
-                case '/':
-                    push(&s, temp1 / temp2);
-                    break;
-            }
-        }
-        i++;
-    }
-    return Get(&s);
-}
+double evaluate(char *expr);
 
 int main() {
-    setlocale(0, "rus");
-    char expr[] = "(5+2)/6-(4+3)*5";
-    char postfix_expr[100];
-    infx2pstfx(expr, postfix_expr);
-    char a[] = "a a";
-    char b[] = "aa";
-    printf("Инфиксная форма: %s\n", expr);
-    printf("Постфиксная форма: %s\n", postfix_expr);
-    printf("Результат: %d\n", eval(postfix_expr));
-    printf("%d\n", strcmp(a, b) == 0);
+    char expr[MAX_EXPR_LENGTH];
+    printf("Enter the expression: ");
+    fgets(expr, MAX_EXPR_LENGTH, stdin);
+    printf("Result: %f\n", evaluate(expr));
     return 0;
+}
+
+double calculate(double num1, double num2, char op) {
+    switch (op) {
+        case '+': return num1 + num2;
+        case '-': return num1 - num2;
+        case '*': return num1 * num2;
+        case '/': return num1 / num2;
+        case '^': return pow(num1, num2);
+        default: return 0;
+    }
+}
+
+double get_value(char *var) {
+    if (*var < 'a' || *var > 'z') {
+        return 0; // некорректное имя переменной
+    }
+    return variables[*var - 'a'];
+}
+
+double parse_number(char **expr) {
+    double result = 0;
+    while (isdigit(**expr)) {
+        result = result * 10 + (**expr - '0');
+        (*expr)++;
+    }
+    if (**expr == '.') {
+        double factor = 0.1;
+        (*expr)++;
+        while (isdigit(**expr)) {
+            result += factor * (**expr - '0');
+            factor /= 10;
+            (*expr)++;
+        }
+    }
+    return result;
+}
+
+double parse_factor(char **expr) {
+    double result;
+    char var_name = **expr;
+    if (isdigit(var_name)) {
+        result = parse_number(expr);
+    } else if (var_name >= 'a' && var_name <= 'z') {
+        result = get_value(*expr);
+        (*expr)++;
+    } else if (var_name == '(') {
+        (*expr)++;
+        result = evaluate(*expr);
+        if (**expr == ')') {
+            (*expr)++;
+        } else {
+            printf("Error: unbalanced parentheses\n");
+            exit(1);
+        }
+    } else {
+        printf("Error: unexpected character '%c'\n", **expr);
+        exit(1);
+    }
+    return result;
+}
+
+double parse_term(char **expr) {
+    double result = parse_factor(expr);
+    while (**expr == '*' || **expr == '/') {
+        char op = **expr;
+        (*expr)++;
+        double num2 = parse_factor(expr);
+        result = calculate(result, num2, op);
+    }
+    return result;
+}
+
+double evaluate(char *expr) {
+    double result = parse_term(&expr);
+    while (*expr) {
+        char op = *expr;
+        if (op == '+' || op == '-' || op == '^') {
+            expr++;
+            double num2 = parse_term(&expr);
+            result = calculate(result, num2, op);
+        } else {
+            printf("Error: unexpected character '%c'\n", *expr);
+            exit(1);
+        }
+    }
+    return result;
 }
