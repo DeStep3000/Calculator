@@ -39,7 +39,7 @@ int calculate(char *str) {
 }
 
 int main() {
-    char str[100];
+    char str[1024];
     printf("Enter the expression: ");
     scanf("%s", str);
     int result = calculate(str);
