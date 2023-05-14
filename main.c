@@ -16,6 +16,7 @@ struct Variable {
 struct Variable vars[MAX_VARS];
 int num_vars = 0;
 
+
 int is_operator(char c) {
     return c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '%';
 }
@@ -181,10 +182,27 @@ double evaluate_expression(char *expr) {
 
 int main() {
     char expr[MAX_EXPR_LEN];
-    printf("Enter an expression:\n");
+    printf("Enter an expression: ");
     fgets(expr, MAX_EXPR_LEN, stdin);
-    set_variable_value("x", 3.14);
-    set_variable_value("y", 2.0);
+    float num;
+    int i, j, len;
+    char variable[MAX_VAR_NAME_LEN]; // максимальная длина имени переменной
+    len = strlen(expr);
+    for (i = 0; i < len; i++) {
+        if (isalpha(expr[i])) { // если символ является буквой
+            for (j = i; j < len; j++) {
+                if (!isalnum(expr[j])) { // если символ не является буквой или цифрой
+                    strncpy(variable, expr + i, j - i);
+                    variable[j - i] = '\0';
+                    printf("Input %s: ", variable);
+                    scanf("%f", &num);
+                    set_variable_value(variable, num);
+                    i = j;
+                    break;
+                }
+            }
+        }
+    }
     double result = evaluate_expression(expr);
     printf("Result: %g\n", result);
     return 0;
