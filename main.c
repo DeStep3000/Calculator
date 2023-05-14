@@ -4,188 +4,171 @@
 #include <string.h>
 #include <math.h>
 
-#define MAX_EXPRESSION_LENGTH 100
-
-typedef enum {
-    OPERATOR_PLUS,
-    OPERATOR_MINUS,
-    OPERATOR_MULTIPLY,
-    OPERATOR_DIVIDE,
-    OPERATOR_POWER,
-} operator_type_t;
+#define MAX_EXPR_LEN 1000
+#define MAX_VARS 100
 
 typedef struct {
+    char *name;
     double value;
-    char name[50];
-} variable_t;
+} Variable;
 
-int precedence(operator_type_t op) {
-    switch (op) {
-        case OPERATOR_PLUS:
-        case OPERATOR_MINUS:
-            return 1;
-        case OPERATOR_MULTIPLY:
-        case OPERATOR_DIVIDE:
-            return 2;
-        case OPERATOR_POWER:
-            return 3;
-        default:
-            return -1;
-    }
-}
+Variable vars[MAX_VARS];
 
-double apply_operator(double left_operand, double right_operand, operator_type_t op) {
-    switch (op) {
-        case OPERATOR_PLUS:
-            return left_operand + right_operand;
-        case OPERATOR_MINUS:
-            return left_operand - right_operand;
-        case OPERATOR_MULTIPLY:
-            return left_operand * right_operand;
-        case OPERATOR_DIVIDE:
-            return left_operand / right_operand;
-        case OPERATOR_POWER:
-            return pow(left_operand, right_operand);
-        default:
-            return 0.0;
-    }
-}
+int num_vars = 0;
 
-int is_operator(char ch) {
-    return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^';
-}
-
-int is_valid_name_char(char ch) {
-    return isalnum(ch) || ch == '_';
-}
-
-variable_t* find_variable(variable_t* variables, int num_variables, char* name) {
-    for (int i = 0; i < num_variables; i++) {
-        if (strcmp(variables[i].name, name) == 0) {
-            return &variables[i];
+double get_variable_value(char *name) {
+    int i;
+    for (i = 0; i < num_vars; i++) {
+        if (strcmp(vars[i].name, name) == 0) {
+            return vars[i].value;
         }
     }
-    return NULL;
+    return NAN;
 }
 
-double evaluate_expression(char* expression, variable_t* variables, int num_variables) {
-    double operand_stack[MAX_EXPRESSION_LENGTH];
-    operator_type_t operator_stack[MAX_EXPRESSION_LENGTH];
-    int operand_stack_top = -1;
-    int operator_stack_top = -1;
+void set_variable_value(char *name, double value) {
+    int i;
+    for (i = 0; i < num_vars; i++) {
+        if (strcmp(vars[i].name, name) == 0) {
+            vars[i].value = value;
+            return;
+        }
+    }
+    vars[num_vars].name = strdup(name);
+    vars[num_vars].value = value;
+    num_vars++;
+}
+
+int is_operator(char c) {
+    return c == '+' || c == '-' || c == '*' || c == '/' || c == '^';
+}
+
+int get_operator_precedence(char c) {
+    switch (c) {
+        case '+':
+        case '-':
+            return 1;
+        case '*':
+        case '/':
+            return 2;
+        case '^':
+            return 3;
+        default:
+            return 0;
+    }
+}
+
+double apply_operator(char op, double x, double y) {
+    switch (op) {
+        case '+':
+            return x + y;
+        case '-':
+            return x - y;
+        case '*':
+            return x * y;
+        case '/':
+            return x / y;
+        case '^':
+            return pow(x, y);
+        default:
+            return NAN;
+    }
+}
+
+double evaluate_expression(char *expr) {
+    char operator_stack[MAX_EXPR_LEN];
+    double value_stack[MAX_EXPR_LEN];
+    int operator_top = -1;
+    int value_top = -1;
+
     int i = 0;
-    while (expression[i] != '\0') {
-        if (isdigit(expression[i])) {
-            char* endptr;
-            double value = strtod(&expression[i], &endptr);
-            operand_stack[++operand_stack_top] = value;
-            i = (int)(endptr - expression);
-        } else if (isalpha(expression[i])) {
-            char name[50];
-            int name_length = 0;
-            while (is_valid_name_char(expression[i])) {
-                name[name_length++] = expression[i++];
+    while (expr[i] != '\0') {
+        if (isspace(expr[i])) {
+            i++;
+            continue;
+        } else if (isdigit(expr[i])) {
+            double value = 0;
+            while (isdigit(expr[i])) {
+                value = value * 10 + (expr[i] - '0');
+                i++;
             }
-            name[name_length] = '\0';
-            variable_t* variable = find_variable(variables, num_variables, name);
-            if (variable == NULL) {
-                printf("Error: undefined variable '%s'\n", name);
+            if (expr[i] == '.') {
+                i++;
+                double factor = 1;
+                while (isdigit(expr[i])) {
+                    factor *= 0.1;
+                    value += (expr[i] - '0') * factor;
+                    i++;
+                }
+            }
+            value_stack[++value_top] = value;
+        } else if (isalpha(expr[i])) {
+            char name[MAX_EXPR_LEN];
+            int j = 0;
+            while (isalpha(expr[i]) || isdigit(expr[i]) || expr[i] == '_') {
+                name[j++] = expr[i++];
+            }
+            name[j] = '\0';
+            double value = get_variable_value(name);
+            if (isnan(value)) {
+                printf("Undefined variable: %s\n", name);
                 return NAN;
             }
-            operand_stack[++operand_stack_top] = variable->value;
-        } else if (is_operator(expression[i])) {
-            operator_type_t op;
-            switch (expression[i]) {
-                case '+':
-                    op = OPERATOR_PLUS;
-                    break;
-                case '-':
-                    op = OPERATOR_MINUS;
-                    break;
-                case '*':
-                    op = OPERATOR_MULTIPLY;
-                    break;
-                case '/':
-                    op = OPERATOR_DIVIDE;
-                    break;
-                case '^':
-                    op = OPERATOR_POWER;
-                    break;
-                default:
-                    printf("Error: invalid operator '%c'\n", expression[i]);
-                    return NAN;
+            value_stack[++value_top] = value;
+        } else if (is_operator(expr[i])) {
+            while (operator_top >= 0 && operator_stack[operator_top] != '(' &&
+                   get_operator_precedence(operator_stack[operator_top]) >= get_operator_precedence(expr[i])) {
+                double y = value_stack[value_top--];
+                double x = value_stack[value_top--];
+                char op = operator_stack[operator_top--];
+                value_stack[++value_top] = apply_operator(op, x, y);
             }
-            while (operator_stack_top >= 0 && precedence(operator_stack[operator_stack_top]) >= precedence(op)) {
-                double right_operand = operand_stack[operand_stack_top--];
-                double left_operand = operand_stack[operand_stack_top--];
-                operator_type_t current_op = operator_stack[operator_stack_top--];
-                operand_stack[++operand_stack_top] = apply_operator(left_operand, right_operand, current_op);
-            }
-            operator_stack[++operator_stack_top] = op;
+            operator_stack[++operator_top] = expr[i];
             i++;
-        } else if (expression[i] == '(') {
-            operator_stack[++operator_stack_top] = OPERATOR_PLUS;
+        } else if (expr[i] == '(') {
+            operator_stack[++operator_top] = '(';
             i++;
-        } else if (expression[i] == ')') {
-            while (operator_stack_top >= 0 && operator_stack[operator_stack_top] != OPERATOR_PLUS) {
-                double right_operand = operand_stack[operand_stack_top--];
-                double left_operand = operand_stack[operand_stack_top--];
-                operator_type_t current_op = operator_stack[operator_stack_top--];
-                operand_stack[++operand_stack_top] = apply_operator(left_operand, right_operand, current_op);
+        } else if (expr[i] == ')') {
+            while (operator_top >= 0 && operator_stack[operator_top] != '(') {
+                double y = value_stack[value_top--];
+                double x = value_stack[value_top--];
+                char op = operator_stack[operator_top--];
+                value_stack[++value_top] = apply_operator(op, x, y);
             }
-            if (operator_stack_top < 0) {
-                printf("Error: unmatched parentheses\n");
+            if (operator_top < 0 || operator_stack[operator_top] != '(') {
+                printf("Mismatched parentheses\n");
                 return NAN;
             }
-            operator_stack_top--;
-            i++;
-        } else if (isspace(expression[i])) {
+            operator_top--;
             i++;
         } else {
-            printf("Error: invalid character '%c'\n", expression[i]);
+            printf("Invalid character: %c\n", expr[i]);
             return NAN;
         }
     }
-    while (operator_stack_top >= 0) {
-        double right_operand = operand_stack[operand_stack_top--];
-        double left_operand = operand_stack[operand_stack_top--];
-        operator_type_t current_op = operator_stack[operator_stack_top--];
-        operand_stack[++operand_stack_top] = apply_operator(left_operand, right_operand, current_op);
+    while (operator_top >= 0) {
+        if (operator_stack[operator_top] == '(' || operator_stack[operator_top] == ')') {
+            printf("Mismatched parentheses\n");
+            return NAN;
+        }
+        double y = value_stack[value_top--];
+        double x = value_stack[value_top--];
+        char op = operator_stack[operator_top--];
+        value_stack[++value_top] = apply_operator(op, x, y);
     }
-    if (operand_stack_top != 0) {
-        printf("Error: invalid expression\n");
+
+    if (value_top != 0 || operator_top != -1) {
+        printf("Invalid expression\n");
         return NAN;
     }
-    return operand_stack[0];
+
+    return value_stack[0];
 }
 
 int main() {
-    char expression[MAX_EXPRESSION_LENGTH];
-    variable_t variables[10];
-    int num_variables = 0;
+    char expr[MAX_EXPR_LEN];
     printf("Enter an expression: ");
-    fgets(expression, MAX_EXPRESSION_LENGTH, stdin);
-    if (expression[strlen(expression)-1] == '\n') {
-        expression[strlen(expression)-1] = '\0';
-    }
-    while (1) {
-        char name[50];
-        printf("Enter a variable name (or 'done' to finish): ");
-        fgets(name, 50, stdin);
-        if (name[strlen(name)-1] == '\n') {
-            name[strlen(name)-1] = '\0';
-        }
-        if (strcmp(name, "done") == 0) {
-            break;
-        }
-        variable_t variable;
-        strcpy(variable.name, name);
-        printf("Enter the value of '%s': ", variable.name);
-        scanf("%lf", &variable.value);
-        getchar(); // consume the newline character
-        variables[num_variables++] = variable;
-    }
-    double result = evaluate_expression(expression, variables, num_variables);
-    printf("Result: %lf\n", result);
+    fgets(expr, MAX_EXPR_LEN, stdin);
+    printf("Result: %f\n", evaluate_expression(expr));
     return 0;
 }
