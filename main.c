@@ -110,13 +110,15 @@ double evaluate_expression(char *expr) {
     double value_stack[MAX_EXPR_LEN];
     int value_top = -1;
     int i = 0;
+    int unary_minus = 0;
     while (expr[i] != '\0' && expr[i] != '\n') {
         if (isspace(expr[i])) {
             i++;
         } else if (isdigit(expr[i])) {
             char *endptr;
             double value = strtod(&expr[i], &endptr);
-            value_stack[++value_top] = value;
+            value_stack[++value_top] = unary_minus ? -value : value;
+            unary_minus = 0;
             i = endptr - expr;
         }
         else if (isalpha(expr[i])) {
@@ -130,17 +132,22 @@ double evaluate_expression(char *expr) {
             if (isnan(value)) {
                 return NAN;
             }
-            value_stack[++value_top] = value;
+            value_stack[++value_top] = unary_minus ? -value : value;
+            unary_minus = 0;
         } else if (is_operator(expr[i])) {
             char op = expr[i];
-            while (operator_top >= 0 && is_operator(operator_stack[operator_top]) &&
-                   get_operator_precedence(op) <= get_operator_precedence(operator_stack[operator_top])) {
-                double y = value_stack[value_top--];
-                double x = value_stack[value_top--];
-                char op2 = operator_stack[operator_top--];
-                value_stack[++value_top] = apply_operator(op2, x, y);
+            if (op == '-' && (i == 0 || is_operator(expr[i - 1]) || expr[i - 1] == '(')) {
+                unary_minus = 1;
+            } else {
+                while (operator_top >= 0 && is_operator(operator_stack[operator_top]) &&
+                       get_operator_precedence(op) <= get_operator_precedence(operator_stack[operator_top])) {
+                    double y = value_stack[value_top--];
+                    double x = value_stack[value_top--];
+                    char op2 = operator_stack[operator_top--];
+                    value_stack[++value_top] = apply_operator(op2, x, y);
+                }
+                operator_stack[++operator_top] = op;
             }
-            operator_stack[++operator_top] = op;
             i++;
         } else if (expr[i] == '(') {
             operator_stack[++operator_top] = expr[i];
