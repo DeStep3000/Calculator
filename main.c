@@ -16,11 +16,12 @@ struct Variable {
 struct Variable vars[MAX_VARS];
 int num_vars = 0;
 
-
+// Проверяет, является ли символ оператором (+, -, *, /, ^, %)
 int is_operator(char c) {
     return c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '%';
 }
 
+// Возвращает приоритет оператора
 int get_operator_precedence(char op) {
     switch (op) {
         case '+':
@@ -37,10 +38,12 @@ int get_operator_precedence(char op) {
     }
 }
 
+// Проверяет, является ли символ допустимым символом имени переменной
 int is_valid_name_char(char c, int i) {
     return isalnum(c) || (i > 0 && c == '_');
 }
 
+// Проверяет, является ли строка допустимым именем переменной
 int is_valid_name(char *name) {
     if (!isalpha(name[0])) {
         return 0;
@@ -54,6 +57,7 @@ int is_valid_name(char *name) {
     return 1;
 }
 
+// Возвращает значение переменной по имени
 double get_variable_value(char *name) {
     for (int i = 0; i < num_vars; i++) {
         if (strcmp(vars[i].name, name) == 0) {
@@ -64,6 +68,7 @@ double get_variable_value(char *name) {
     return NAN;
 }
 
+// Устанавливает значение переменной по имени
 void set_variable_value(char *name, double value) {
     for (int i = 0; i < num_vars; i++) {
         if (strcmp(vars[i].name, name) == 0) {
@@ -85,6 +90,7 @@ void set_variable_value(char *name, double value) {
     vars[num_vars++] = var;
 }
 
+// Выполняет операцию между двумя операндами в соответствии с оператором
 double apply_operator(char op, double x, double y) {
     switch (op) {
         case '+':
@@ -104,88 +110,94 @@ double apply_operator(char op, double x, double y) {
     }
 }
 
+// Вычисляет значение арифметического выражения
 double evaluate_expression(char *expr) {
-    int operator_top = -1;
-    char operator_stack[MAX_EXPR_LEN];
-    double value_stack[MAX_EXPR_LEN];
-    int value_top = -1;
-    int i = 0;
-    int unary_minus = 0;
+    int operator_top = -1; // Верхняя граница стека операторов
+    char operator_stack[MAX_EXPR_LEN]; // Стек операторов
+    double value_stack[MAX_EXPR_LEN]; // Стек значений
+    int value_top = -1; // Верхняя граница стека значений
+    int i = 0; // Текущая позиция в выражении
+    int unary_minus = 0; // Флаг для обработки унарного минуса
+
     while (expr[i] != '\0' && expr[i] != '\n') {
         if (isspace(expr[i])) {
-            i++;
+            i++; // Пропускаем пробелы
         } else if (isdigit(expr[i])) {
             char *endptr;
-            double value = strtod(&expr[i], &endptr);
-            value_stack[++value_top] = unary_minus ? -value : value;
-            unary_minus = 0;
-            i = endptr - expr;
+            double value = strtod(&expr[i], &endptr); // Преобразуем подстроку в число
+            value_stack[++value_top] = unary_minus ? -value : value; // Добавляем значение в стек значений
+            unary_minus = 0; // Сбрасываем флаг унарного минуса
+            i = endptr - expr; // Перемещаем позицию в выражении после числа
         }
         else if (isalpha(expr[i])) {
             char name[MAX_VAR_NAME_LEN];
             int j = 0;
             while (is_valid_name_char(expr[i], j)) {
-                name[j++] = expr[i++];
+                name[j++] = expr[i++]; // Формируем имя переменной
             }
             name[j] = '\0';
-            double value = get_variable_value(name);
+            double value = get_variable_value(name); // Получаем значение переменной по имени
             if (isnan(value)) {
-                return NAN;
+                return NAN; // Если значение не найдено, возвращаем NAN
             }
-            value_stack[++value_top] = unary_minus ? -value : value;
-            unary_minus = 0;
+            value_stack[++value_top] = unary_minus ? -value : value; // Добавляем значение в стек значений
+            unary_minus = 0; // Сбрасываем флаг унарного минуса
         } else if (is_operator(expr[i])) {
-            char op = expr[i];
+            char op = expr[i]; // Получаем оператор
             if (op == '-' && (i == 0 || is_operator(expr[i - 1]) || expr[i - 1] == '(')) {
-                unary_minus = 1;
+                unary_minus = 1; // Устанавливаем флаг унарного минуса
             } else {
                 while (operator_top >= 0 && is_operator(operator_stack[operator_top]) &&
                        get_operator_precedence(op) <= get_operator_precedence(operator_stack[operator_top])) {
                     double y = value_stack[value_top--];
                     double x = value_stack[value_top--];
                     char op2 = operator_stack[operator_top--];
-                    value_stack[++value_top] = apply_operator(op2, x, y);
+                    value_stack[++value_top] = apply_operator(op2, x, y); // Применяем оператор к значениям и добавляем результат в стек значений
                 }
-                operator_stack[++operator_top] = op;
+                operator_stack[++operator_top] = op; // Добавляем оператор в стек операторов
             }
-            i++;
+            i++; // Перемещаем позицию в выражении на следующий символ
         } else if (expr[i] == '(') {
-            operator_stack[++operator_top] = expr[i];
-            i++;
+            operator_stack[++operator_top] = expr[i]; // Добавляем открывающую скобку в стек операторов
+            i++; // Перемещаем позицию в выражении на следующий символ
         } else if (expr[i] == ')') {
             while (operator_top >= 0 && operator_stack[operator_top] != '(') {
                 double y = value_stack[value_top--];
                 double x = value_stack[value_top--];
                 char op = operator_stack[operator_top--];
-                value_stack[++value_top] = apply_operator(op, x, y);
+                value_stack[++value_top] = apply_operator(op, x, y); // Применяем оператор к значениям и добавляем результат в стек значений
             }
             if (operator_top < 0 || operator_stack[operator_top] != '(') {
                 printf("Mismatched parentheses\n");
-                return NAN;
+                return NAN; // Если скобки не согласованы, возвращаем NAN
             }
-            operator_top--;
-            i++;
+            operator_top--; // Удаляем открывающую скобку из стека операторов
+            i++; // Перемещаем позицию в выражении на следующий символ
         } else {
             printf("Invalid character: %c\n", expr[i]);
-            return NAN;
+            return NAN; // Если символ недопустим, возвращаем NAN
         }
     }
+
     while (operator_top >= 0) {
         if (operator_stack[operator_top] == '(') {
             printf("Mismatched parentheses\n");
-            return NAN;
+            return NAN; // Если скобки не согласованы, возвращаем NAN
         }
         double y = value_stack[value_top--];
         double x = value_stack[value_top--];
         char op = operator_stack[operator_top--];
-        value_stack[++value_top] = apply_operator(op, x, y);
+        value_stack[++value_top] = apply_operator(op, x, y); // Применяем оператор к значениям и добавляем результат в стек значений
     }
+
     if (value_top != 0 || operator_top != -1) {
         printf("Invalid expression\n");
-        return NAN;
+        return NAN; // Если стеки значений и операторов не пусты, или стек значений содержит больше одного элемента, возвращаем NAN
     }
-    return value_stack[value_top];
+
+    return value_stack[value_top]; // Возвращаем результат вычисления выражения
 }
+
 
 int main() {
     char expr[MAX_EXPR_LEN];
